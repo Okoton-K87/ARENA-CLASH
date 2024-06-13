@@ -63,16 +63,16 @@ class Platformer extends Phaser.Scene {
         this.pKey = this.input.keyboard.addKey('P');
 
         // debug key listener (assigned to D key)
-        this.input.keyboard.on('keydown-D', () => {
+        this.input.keyboard.on('keydown-L', () => {
             this.physics.world.drawDebug = this.physics.world.drawDebug ? false : true;
             this.physics.world.debugGraphic.clear();
         }, this);
 
         // movement vfx
-        my.vfx.walking = this.add.particles(0, 0, "kenny-particles", {
-            frame: ['smoke_03.png', 'smoke_09.png'],
-            scale: {start: 0.03, end: 0.1},
-            lifespan: 350,
+        my.vfx.walking = this.add.particles(0, 5, "kenny-particles", {
+            frame: ['smoke_01.png', 'smoke_01.png', "smoke_01.png"],
+            scale: {start: 0.01, end: 0.03},
+            lifespan: 200,
             alpha: {start: 1, end: 0.1}, 
         });
 
@@ -187,7 +187,7 @@ class Platformer extends Phaser.Scene {
 
         this.lastShotTime = now;
 
-        const graphics = this.add.graphics({ lineStyle: { width: 2, color: 0xffff00 } });
+        const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0xffff00 } });
 
         // Starting point of the bullet
         const startX = my.sprite.player.x;
@@ -202,29 +202,54 @@ class Platformer extends Phaser.Scene {
         let endX = startX + velocity.x;
         let endY = startY + velocity.y;
 
+        // Variable to store the closest intersection point
+        let closestIntersection = null;
+        let closestDist = Infinity;
+        let closestTarget = null;
+
         // Check if the bullet hits any target
-        let hitTarget = false;
         this.targets.forEach(target => {
-            if (!hitTarget && target.active) {
+            if (target.active) {
                 const targetBounds = target.getBounds();
                 const line = new Phaser.Geom.Line(startX, startY, endX, endY);
                 if (Phaser.Geom.Intersects.LineToRectangle(line, targetBounds)) {
                     // Calculate the intersection point
                     const intersection = this.getLineIntersection(line, targetBounds);
                     if (intersection) {
-                        endX = intersection.x;
-                        endY = intersection.y;
+                        const dist = Phaser.Math.Distance.Between(startX, startY, intersection.x, intersection.y);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestIntersection = intersection;
+                            closestTarget = target;
+                        }
                     }
-
-                    target.health -= 10;
-                    this.impactSound.play();
-                    if (target.health <= 0) {
-                        target.destroy();
-                    }
-                    hitTarget = true;
                 }
             }
         });
+
+        // Check if the bullet hits any map tiles
+        const tileHits = this.mapLayerIntersects(startX, startY, endX, endY);
+        if (tileHits) {
+            const dist = Phaser.Math.Distance.Between(startX, startY, tileHits.x, tileHits.y);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestIntersection = tileHits;
+                closestTarget = null; // Hit a tile, not a target
+            }
+        }
+
+        if (closestIntersection) {
+            endX = closestIntersection.x;
+            endY = closestIntersection.y;
+
+            if (closestTarget) {
+                closestTarget.health -= 10;
+                this.impactSound.play();
+                if (closestTarget.health <= 0) {
+                    closestTarget.destroy();
+                }
+            }
+        }
 
         // Draw the bullet trace
         graphics.lineBetween(startX, startY, endX, endY);
@@ -233,7 +258,7 @@ class Platformer extends Phaser.Scene {
         this.tweens.add({
             targets: graphics,
             alpha: 0,
-            duration: 200,
+            duration: 10,
             onComplete: () => {
                 graphics.destroy();
             }
@@ -262,6 +287,35 @@ class Platformer extends Phaser.Scene {
         checkIntersection(rect.right, rect.y, rect.right, rect.bottom);
         checkIntersection(rect.right, rect.bottom, rect.x, rect.bottom);
         checkIntersection(rect.x, rect.bottom, rect.x, rect.y);
+
+        return closestPoint;
+    }
+
+    mapLayerIntersects(startX, startY, endX, endY) {
+        const line = new Phaser.Geom.Line(startX, startY, endX, endY);
+        let closestPoint = null;
+        let closestDist = Infinity;
+
+        this.groundLayer.forEachTile(tile => {
+            if (tile.collides) {
+                const tileBounds = new Phaser.Geom.Rectangle(
+                    tile.pixelX,
+                    tile.pixelY,
+                    tile.width,
+                    tile.height
+                );
+                if (Phaser.Geom.Intersects.LineToRectangle(line, tileBounds)) {
+                    const intersection = this.getLineIntersection(line, tileBounds);
+                    if (intersection) {
+                        const dist = Phaser.Math.Distance.Between(startX, startY, intersection.x, intersection.y);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestPoint = intersection;
+                        }
+                    }
+                }
+            }
+        });
 
         return closestPoint;
     }
