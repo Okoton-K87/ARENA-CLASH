@@ -11,6 +11,7 @@ class Platformer extends Phaser.Scene {
         this.JUMP_VELOCITY = -600;
         this.PARTICLE_VELOCITY = 50;
         this.SCALE = 2.0;
+        this.ATTACK_SPEED = 50; // Attack speed in milliseconds
     }
 
     create() {
@@ -19,8 +20,6 @@ class Platformer extends Phaser.Scene {
         this.map = this.add.tilemap("platformer-level-1", 18, 18, 45, 25);
 
         // Add a tileset to the map
-        // First parameter: name we gave the tileset in Tiled
-        // Second parameter: key for the tilesheet (from this.load.image in Load.js)
         this.tileset = this.map.addTilesetImage("kenny_tilemap_packed", "tilemap_tiles");
 
         // Create a layer
@@ -31,12 +30,6 @@ class Platformer extends Phaser.Scene {
             collides: true
         });
 
-        // TODO: Add createFromObjects here
-        
-
-        // TODO: Add turn into Arcade Physics here
-        
-
         // set up player avatar
         my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");
         my.sprite.player.setCollideWorldBounds(true);
@@ -44,60 +37,176 @@ class Platformer extends Phaser.Scene {
         // Enable collision handling
         this.physics.add.collider(my.sprite.player, this.groundLayer);
 
-        // TODO: Add coin collision handler
-        
-
         // set up Phaser-provided cursor key input
         cursors = this.input.keyboard.createCursorKeys();
+        this.aKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+        this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-        this.rKey = this.input.keyboard.addKey('R');
+        this.pKey = this.input.keyboard.addKey('P');
 
         // debug key listener (assigned to D key)
         this.input.keyboard.on('keydown-D', () => {
-            this.physics.world.drawDebug = this.physics.world.drawDebug ? false : true
-            this.physics.world.debugGraphic.clear()
+            this.physics.world.drawDebug = this.physics.world.drawDebug ? false : true;
+            this.physics.world.debugGraphic.clear();
         }, this);
 
-        // TODO: Add movement vfx here
-        
+        // movement vfx
+        my.vfx.walking = this.add.particles(0, 0, "kenny-particles", {
+            frame: ['smoke_03.png', 'smoke_09.png'],
+            scale: {start: 0.03, end: 0.1},
+            lifespan: 350,
+            alpha: {start: 1, end: 0.1}, 
+        });
 
-        // TODO: add camera code here
-        
+        my.vfx.walking.stop();
 
+        // set up camera
+        this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
+        this.cameras.main.startFollow(my.sprite.player, true, 0.25, 0.25); // (target, [,roundPixels][,lerpX][,lerpY])
+        this.cameras.main.setDeadzone(50, 50);
+        this.cameras.main.setZoom(this.SCALE);
+
+        // set game world bounds
+        this.physics.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
+
+        // Create the gun sprite and scale it down
+        this.gun = this.add.sprite(0, 0, 'gun').setOrigin(0.5, 0.5).setScale(0.5);
+
+        // Input handling for shooting
+        this.input.on('pointerdown', this.startShooting, this);
+        this.input.on('pointerup', this.stopShooting, this);
+
+        this.isShooting = false;
+
+        // Load audio
+        this.jumpSound = this.sound.add('jump');
+        this.shootSound = this.sound.add('shoot', { loop: true });
     }
 
     update() {
-        if(cursors.left.isDown) {
+        if (this.aKey.isDown) {
             my.sprite.player.setAccelerationX(-this.ACCELERATION);
             my.sprite.player.resetFlip();
             my.sprite.player.anims.play('walk', true);
-            // TODO: add particle following code here
+            my.vfx.walking.startFollow(my.sprite.player, my.sprite.player.displayWidth / 2 - 10, my.sprite.player.displayHeight / 2 - 5, false);
+            my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
 
-        } else if(cursors.right.isDown) {
+            if (my.sprite.player.body.blocked.down) {
+                my.vfx.walking.start();
+            }
+
+        } else if (this.dKey.isDown) {
             my.sprite.player.setAccelerationX(this.ACCELERATION);
             my.sprite.player.setFlip(true, false);
             my.sprite.player.anims.play('walk', true);
-            // TODO: add particle following code here
+            my.vfx.walking.startFollow(my.sprite.player, my.sprite.player.displayWidth / 2 - 10, my.sprite.player.displayHeight / 2 - 5, false);
+            my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
+
+            if (my.sprite.player.body.blocked.down) {
+                my.vfx.walking.start();
+            }
 
         } else {
-            // Set acceleration to 0 and have DRAG take over
             my.sprite.player.setAccelerationX(0);
             my.sprite.player.setDragX(this.DRAG);
             my.sprite.player.anims.play('idle');
-            // TODO: have the vfx stop playing
+            my.vfx.walking.stop();
         }
 
         // player jump
-        // note that we need body.blocked rather than body.touching b/c the former applies to tilemap tiles and the latter to the "ground"
-        if(!my.sprite.player.body.blocked.down) {
+        if (!my.sprite.player.body.blocked.down) {
             my.sprite.player.anims.play('jump');
         }
-        if(my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(cursors.up)) {
+        if (my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
             my.sprite.player.body.setVelocityY(this.JUMP_VELOCITY);
+            this.jumpSound.play();
         }
 
-        if(Phaser.Input.Keyboard.JustDown(this.rKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.pKey)) {
             this.scene.restart();
         }
+
+        // Update gun position and rotation
+        this.updateGunPosition();
+
+        // Handle shooting
+        if (this.isShooting) {
+            this.shoot();
+        }
+    }
+
+    updateGunPosition() {
+        const pointer = this.input.activePointer;
+        const angle = Phaser.Math.Angle.Between(my.sprite.player.x, my.sprite.player.y, pointer.worldX, pointer.worldY);
+        this.gun.setPosition(my.sprite.player.x, my.sprite.player.y);
+        this.gun.setRotation(angle);
+
+        if (pointer.worldX < my.sprite.player.x) {
+            this.gun.setFlipY(true);
+        } else {
+            this.gun.setFlipY(false);
+        }
+    }
+
+    startShooting() {
+        this.isShooting = true;
+        this.lastShotTime = 0;
+        this.shootSound.play();
+    }
+
+    stopShooting() {
+        this.isShooting = false;
+        this.shootSound.stop();
+    }
+
+    shoot() {
+        const now = this.time.now;
+
+        if (now - this.lastShotTime < this.ATTACK_SPEED) {
+            return;
+        }
+
+        this.lastShotTime = now;
+
+        const graphics = this.add.graphics({ lineStyle: { width: 2, color: 0xffff00 } });
+
+        // Starting point of the bullet
+        const startX = my.sprite.player.x;
+        const startY = my.sprite.player.y;
+
+        // Calculate the bullet direction
+        const angle = Phaser.Math.Angle.Between(startX, startY, this.input.activePointer.worldX, this.input.activePointer.worldY);
+        const velocity = new Phaser.Math.Vector2();
+        this.physics.velocityFromRotation(angle, 1000, velocity);
+
+        // Create a ray for collision detection
+        const ray = new Phaser.Geom.Line(startX, startY, startX + velocity.x, startY + velocity.y);
+        const intersect = this.groundLayer.getTilesWithinShape(ray);
+
+        let endX = ray.x2;
+        let endY = ray.y2;
+
+        for (let i = 0; i < intersect.length; i++) {
+            const tile = intersect[i];
+            if (tile.collides) {
+                endX = tile.getCenterX();
+                endY = tile.getCenterY();
+                break;
+            }
+        }
+
+        // Draw the bullet trace
+        graphics.lineBetween(startX, startY, endX, endY);
+
+        // Create an animation effect for the bullet travel
+        this.tweens.add({
+            targets: graphics,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => {
+                graphics.destroy();
+            }
+        });
     }
 }
