@@ -28,6 +28,8 @@ class Load extends Phaser.Scene {
         // Load audio assets
         this.load.audio("jump", "jump.wav");
         this.load.audio("shoot", "P90.mp3");
+        this.load.audio("impact", "impact_1.mp3");
+
     }
      
 

@@ -34,8 +34,25 @@ class Platformer extends Phaser.Scene {
         my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");
         my.sprite.player.setCollideWorldBounds(true);
 
+        // set up targets array
+        this.targets = [];
+
+        // create target sprites
+        const target1 = this.physics.add.sprite(400, 345, "platformer_characters", "tile_0003.png");
+        target1.setCollideWorldBounds(true);
+        target1.health = 100; // Set target health
+        this.targets.push(target1);
+
+        const target2 = this.physics.add.sprite(450, 345, "platformer_characters", "tile_0003.png");
+        target2.setCollideWorldBounds(true);
+        target2.health = 100;
+        this.targets.push(target2);
+
         // Enable collision handling
         this.physics.add.collider(my.sprite.player, this.groundLayer);
+        this.targets.forEach(target => {
+            this.physics.add.collider(target, this.groundLayer);
+        });
 
         // set up Phaser-provided cursor key input
         cursors = this.input.keyboard.createCursorKeys();
@@ -71,7 +88,7 @@ class Platformer extends Phaser.Scene {
         this.physics.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
 
         // Create the gun sprite and scale it down
-        this.gun = this.add.sprite(0, 0, 'gun').setOrigin(0.5, 0.5).setScale(0.5);
+        this.gun = this.add.sprite(0, 0, 'gun').setOrigin(0.5, 0.5).setScale(0.4);
 
         // Input handling for shooting
         this.input.on('pointerdown', this.startShooting, this);
@@ -82,6 +99,7 @@ class Platformer extends Phaser.Scene {
         // Load audio
         this.jumpSound = this.sound.add('jump');
         this.shootSound = this.sound.add('shoot', { loop: true });
+        this.impactSound = this.sound.add('impact');
     }
 
     update() {
@@ -139,7 +157,7 @@ class Platformer extends Phaser.Scene {
     updateGunPosition() {
         const pointer = this.input.activePointer;
         const angle = Phaser.Math.Angle.Between(my.sprite.player.x, my.sprite.player.y, pointer.worldX, pointer.worldY);
-        this.gun.setPosition(my.sprite.player.x, my.sprite.player.y);
+        this.gun.setPosition(my.sprite.player.x, my.sprite.player.y + 8);
         this.gun.setRotation(angle);
 
         if (pointer.worldX < my.sprite.player.x) {
@@ -173,28 +191,40 @@ class Platformer extends Phaser.Scene {
 
         // Starting point of the bullet
         const startX = my.sprite.player.x;
-        const startY = my.sprite.player.y;
+        const startY = my.sprite.player.y + 8;
 
         // Calculate the bullet direction
         const angle = Phaser.Math.Angle.Between(startX, startY, this.input.activePointer.worldX, this.input.activePointer.worldY);
         const velocity = new Phaser.Math.Vector2();
         this.physics.velocityFromRotation(angle, 1000, velocity);
 
-        // Create a ray for collision detection
-        const ray = new Phaser.Geom.Line(startX, startY, startX + velocity.x, startY + velocity.y);
-        const intersect = this.groundLayer.getTilesWithinShape(ray);
+        // Calculate the endpoint of the bullet trace
+        let endX = startX + velocity.x;
+        let endY = startY + velocity.y;
 
-        let endX = ray.x2;
-        let endY = ray.y2;
+        // Check if the bullet hits any target
+        let hitTarget = false;
+        this.targets.forEach(target => {
+            if (!hitTarget && target.active) {
+                const targetBounds = target.getBounds();
+                const line = new Phaser.Geom.Line(startX, startY, endX, endY);
+                if (Phaser.Geom.Intersects.LineToRectangle(line, targetBounds)) {
+                    // Calculate the intersection point
+                    const intersection = this.getLineIntersection(line, targetBounds);
+                    if (intersection) {
+                        endX = intersection.x;
+                        endY = intersection.y;
+                    }
 
-        for (let i = 0; i < intersect.length; i++) {
-            const tile = intersect[i];
-            if (tile.collides) {
-                endX = tile.getCenterX();
-                endY = tile.getCenterY();
-                break;
+                    target.health -= 10;
+                    this.impactSound.play();
+                    if (target.health <= 0) {
+                        target.destroy();
+                    }
+                    hitTarget = true;
+                }
             }
-        }
+        });
 
         // Draw the bullet trace
         graphics.lineBetween(startX, startY, endX, endY);
@@ -208,5 +238,31 @@ class Platformer extends Phaser.Scene {
                 graphics.destroy();
             }
         });
+    }
+
+    getLineIntersection(line, rect) {
+        let closestPoint = null;
+        let closestDist = Infinity;
+
+        const checkIntersection = (x1, y1, x2, y2) => {
+            const intersection = Phaser.Geom.Intersects.GetLineToLine(
+                line,
+                new Phaser.Geom.Line(x1, y1, x2, y2)
+            );
+            if (intersection) {
+                const dist = Phaser.Math.Distance.Between(line.x1, line.y1, intersection.x, intersection.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestPoint = intersection;
+                }
+            }
+        };
+
+        checkIntersection(rect.x, rect.y, rect.right, rect.y);
+        checkIntersection(rect.right, rect.y, rect.right, rect.bottom);
+        checkIntersection(rect.right, rect.bottom, rect.x, rect.bottom);
+        checkIntersection(rect.x, rect.bottom, rect.x, rect.y);
+
+        return closestPoint;
     }
 }
