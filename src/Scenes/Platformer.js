@@ -17,6 +17,7 @@ class Platformer extends Phaser.Scene {
         this.SCALE = 2.5;
         this.ATTACK_SPEED = 75;
         this.MAG_SIZE = 50;
+        this.PLAYER_HEALTH = 100; // Player's health
     }
 
     create() {
@@ -33,21 +34,17 @@ class Platformer extends Phaser.Scene {
         this.groundLayer.setCollisionByProperty({ collides: true });
 
         // Set up player avatar
-        this.my = {sprite: {}, text: {}, vfx: {}};
+        this.my = { sprite: {}, text: {}, vfx: {} };
         this.my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");
         this.my.sprite.player.setCollideWorldBounds(true);
+        this.my.sprite.player.health = this.PLAYER_HEALTH;
 
         // Set up targets array
         this.targets = [];
-        const target1 = this.physics.add.sprite(400, 345, "platformer_characters", "tile_0003.png");
-        target1.setCollideWorldBounds(true);
-        target1.health = 100;
-        this.targets.push(target1);
+        const target1 = this.createTarget(400, 345);
+        const target2 = this.createTarget(450, 345);
 
-        const target2 = this.physics.add.sprite(450, 345, "platformer_characters", "tile_0003.png");
-        target2.setCollideWorldBounds(true);
-        target2.health = 100;
-        this.targets.push(target2);
+        this.targets.push(target1, target2);
 
         // Enable collision handling
         this.physics.add.collider(this.my.sprite.player, this.groundLayer);
@@ -100,6 +97,11 @@ class Platformer extends Phaser.Scene {
             .setDepth(2)
             .setScrollFactor(0);
 
+        // Add bitmap text display for health
+        this.my.text.health = this.add.bitmapText(this.cameras.main.centerX - (this.cameras.main.displayWidth / 2), this.cameras.main.centerY - (this.cameras.main.displayHeight / 2), "platformerNums", "L" + this.my.sprite.player.health, 18)
+            .setDepth(2)
+            .setScrollFactor(0);
+
         // Load audio
         this.jumpSound = this.sound.add('jump');
         this.shootSound = this.sound.add('shoot');
@@ -107,12 +109,23 @@ class Platformer extends Phaser.Scene {
         this.reloadSound = this.sound.add('reload');
     }
 
+    createTarget(x, y) {
+        const target = this.physics.add.sprite(x, y, "platformer_characters", "tile_0002.png");
+        target.setCollideWorldBounds(true);
+        target.health = 100;
+        target.healthBar = this.add.graphics({ x: target.x - 9, y: target.y - 20 });
+        target.direction = Phaser.Math.Between(0, 1) === 0 ? -1 : 1;
+        target.speed = 50;
+        target.anims.play('target_idle');
+        return target;
+    }
+
     update() {
         // Handle player movement and animations
         if (this.aKey.isDown) {
             this.my.sprite.player.setAccelerationX(-this.ACCELERATION);
             this.my.sprite.player.resetFlip();
-            this.my.sprite.player.anims.play('walk', true);
+            this.my.sprite.player.anims.play('player_walk', true);
             this.my.vfx.walking.startFollow(this.my.sprite.player, this.my.sprite.player.displayWidth / 2 - 10, this.my.sprite.player.displayHeight / 2 - 5, false);
             this.my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
 
@@ -123,7 +136,7 @@ class Platformer extends Phaser.Scene {
         } else if (this.dKey.isDown) {
             this.my.sprite.player.setAccelerationX(this.ACCELERATION);
             this.my.sprite.player.setFlip(true, false);
-            this.my.sprite.player.anims.play('walk', true);
+            this.my.sprite.player.anims.play('player_walk', true);
             this.my.vfx.walking.startFollow(this.my.sprite.player, this.my.sprite.player.displayWidth / 2 - 10, this.my.sprite.player.displayHeight / 2 - 5, false);
             this.my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
 
@@ -134,13 +147,13 @@ class Platformer extends Phaser.Scene {
         } else {
             this.my.sprite.player.setAccelerationX(0);
             this.my.sprite.player.setDragX(this.DRAG);
-            this.my.sprite.player.anims.play('idle');
+            this.my.sprite.player.anims.play('player_idle');
             this.my.vfx.walking.stop();
         }
 
         // Player jump
         if (!this.my.sprite.player.body.blocked.down) {
-            this.my.sprite.player.anims.play('jump');
+            this.my.sprite.player.anims.play('player_jump');
         }
         if (this.my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
             this.my.sprite.player.body.setVelocityY(this.JUMP_VELOCITY);
@@ -164,8 +177,17 @@ class Platformer extends Phaser.Scene {
             this.shoot();
         }
 
-        // Update ammo text display
+        // Update ammo and health text display
         this.my.text.ammo.setText('Ammo ' + this.ammo);
+        this.my.text.health.setText('L' + this.my.sprite.player.health);
+
+        // Update target health bars and AI
+        this.targets.forEach(target => {
+            if (target.active) {
+                this.updateTargetHealthBar(target);
+                this.updateTargetAI(target);
+            }
+        });
     }
 
     updateGunPosition() {
@@ -263,6 +285,7 @@ class Platformer extends Phaser.Scene {
                 this.impactSound.play();
                 if (closestTarget.health <= 0) {
                     closestTarget.destroy();
+                    closestTarget.healthBar.destroy();
                 }
             }
         }
@@ -297,7 +320,7 @@ class Platformer extends Phaser.Scene {
         this.my.text.ammoText.setText("reload");
         setTimeout(() => {
             this.my.text.ammoText.setText("ammo: ");
-        }, 1000);
+        }, 3000);
         this.time.delayedCall(3000, () => {
             this.ammo = this.MAG_SIZE;
             this.reloading = false;
@@ -360,5 +383,34 @@ class Platformer extends Phaser.Scene {
         });
 
         return closestPoint;
+    }
+
+    updateTargetHealthBar(target) {
+        const barWidth = 18;
+        const barHeight = 2;
+        const healthPercentage = target.health / 100;
+        target.healthBar.clear();
+        target.healthBar.fillStyle(0xff0000, 1); // Red background for missing health
+        target.healthBar.fillRect(0, 0, barWidth, barHeight);
+        target.healthBar.fillStyle(0x00ff00, 1); // Green foreground for remaining health
+        target.healthBar.fillRect(0, 0, barWidth * healthPercentage, barHeight);
+        target.healthBar.x = target.x - 9;
+        target.healthBar.y = target.y - 20;
+    }
+
+    updateTargetAI(target) {
+        // Basic AI to move the targets left and right
+        if (target.body.blocked.left || target.body.blocked.right) {
+            target.direction *= -1; // Change direction when hitting a wall
+            target.flipX = target.direction === 1; // Flip the sprite based on direction
+        }
+        target.setVelocityX(target.direction * target.speed);
+
+        // Update target animation based on movement
+        if (target.body.velocity.x !== 0) {
+            target.anims.play('target_walk', true);
+        } else {
+            target.anims.play('target_idle', true);
+        }
     }
 }
