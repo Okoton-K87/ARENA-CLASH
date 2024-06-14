@@ -5,34 +5,36 @@ class Load extends Phaser.Scene {
 
     preload() {
         this.load.setPath("./assets/");
-    
+
         // Load characters spritesheet
         this.load.atlas("platformer_characters", "tilemap-characters-packed.png", "tilemap-characters-packed.json");
-    
+
         // Load tilemap information
-        this.load.image("tilemap_tiles", "tilemap_packed.png");                         // Packed tilemap
-        this.load.tilemapTiledJSON("platformer-level-1", "platformer-level-1.tmj");   // Tilemap in JSON
-    
+        this.load.image("tilemap_tiles", "tilemap_packed.png"); // Packed tilemap
+        this.load.tilemapTiledJSON("platformer-level-1", "platformer-level-1.tmj"); // Tilemap in JSON
+
         // Load the tilemap as a spritesheet
         this.load.spritesheet("tilemap_sheet", "tilemap_packed.png", {
             frameWidth: 18,
             frameHeight: 18
         });
-    
+
         // Load particles
         this.load.multiatlas("kenny-particles", "kenny-particles.json");
-    
+
         // Load gun asset
         this.load.image("gun", "SMG-4.png");
-    
+
         // Load audio assets
         this.load.audio("jump", "jump.wav");
         this.load.audio("shoot", "P90.mp3");
-        this.load.audio("impact", "impact_1.mp3");
+        this.load.audio("impact", "impactGlass_light_000.ogg");
         this.load.audio("reload", "P90_reload.mp3");
 
+        // Load bitmap fonts
+        this.load.bitmapFont("platformerNums", "platformerNums.png", "platformerNums.xml");
+        this.load.bitmapFont("tinyText", "tinyski_bitmap.png", "tinyski_bitmap.xml");
     }
-     
 
     create() {
         this.anims.create({
@@ -65,11 +67,9 @@ class Load extends Phaser.Scene {
             ],
         });
 
-         // ...and pass to the next Scene
-         this.scene.start("platformerScene");
+        // ...and pass to the next Scene
+        this.scene.start("platformerScene");
     }
 
-    // Never get here since a new scene is started in create()
-    update() {
-    }
+    update() {}
 }

@@ -4,28 +4,23 @@ class Platformer extends Phaser.Scene {
     }
 
     preload() {
-        // Load audio files
-        this.load.audio('jump', 'assets/audio/jump.mp3');
-        this.load.audio('shoot', 'assets/audio/shoot.mp3');
-        this.load.audio('impact', 'assets/audio/impact.mp3');
-        this.load.audio('reload', 'assets/audio/reload.mp3'); // Make sure the file path is correct
+        // Load audio files (already done in Load.js)
     }
 
     init() {
-        // variables and settings
+        // Variables and settings
         this.ACCELERATION = 400;
-        this.DRAG = 500;    // DRAG < ACCELERATION = icy slide
+        this.DRAG = 700;
         this.physics.world.gravity.y = 1500;
         this.JUMP_VELOCITY = -600;
         this.PARTICLE_VELOCITY = 50;
-        this.SCALE = 2.0;
-        this.ATTACK_SPEED = 75; // Attack speed in milliseconds
-        this.MAG_SIZE = 50;     // Magazine size
+        this.SCALE = 2.5;
+        this.ATTACK_SPEED = 75;
+        this.MAG_SIZE = 50;
     }
 
     create() {
-        // Create a new tilemap game object which uses 18x18 pixel tiles, and is
-        // 45 tiles wide and 25 tiles tall.
+        // Create a new tilemap game object which uses 18x18 pixel tiles
         this.map = this.add.tilemap("platformer-level-1", 18, 18, 45, 25);
 
         // Add a tileset to the map
@@ -35,21 +30,18 @@ class Platformer extends Phaser.Scene {
         this.groundLayer = this.map.createLayer("Ground-n-Platforms", this.tileset, 0, 0);
 
         // Make it collidable
-        this.groundLayer.setCollisionByProperty({
-            collides: true
-        });
+        this.groundLayer.setCollisionByProperty({ collides: true });
 
-        // set up player avatar
-        my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");
-        my.sprite.player.setCollideWorldBounds(true);
+        // Set up player avatar
+        this.my = {sprite: {}, text: {}, vfx: {}};
+        this.my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");
+        this.my.sprite.player.setCollideWorldBounds(true);
 
-        // set up targets array
+        // Set up targets array
         this.targets = [];
-
-        // create target sprites
         const target1 = this.physics.add.sprite(400, 345, "platformer_characters", "tile_0003.png");
         target1.setCollideWorldBounds(true);
-        target1.health = 100; // Set target health
+        target1.health = 100;
         this.targets.push(target1);
 
         const target2 = this.physics.add.sprite(450, 345, "platformer_characters", "tile_0003.png");
@@ -58,42 +50,33 @@ class Platformer extends Phaser.Scene {
         this.targets.push(target2);
 
         // Enable collision handling
-        this.physics.add.collider(my.sprite.player, this.groundLayer);
-        this.targets.forEach(target => {
-            this.physics.add.collider(target, this.groundLayer);
-        });
+        this.physics.add.collider(this.my.sprite.player, this.groundLayer);
+        this.targets.forEach(target => this.physics.add.collider(target, this.groundLayer));
 
-        // set up Phaser-provided cursor key input
-        cursors = this.input.keyboard.createCursorKeys();
+        // Set up Phaser-provided cursor key input
+        this.cursors = this.input.keyboard.createCursorKeys();
         this.aKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R); // Reload key
         this.pKey = this.input.keyboard.addKey('P');
 
-        // debug key listener (assigned to D key)
-        this.input.keyboard.on('keydown-L', () => {
-            this.physics.world.drawDebug = this.physics.world.drawDebug ? false : true;
-            this.physics.world.debugGraphic.clear();
-        }, this);
-
-        // movement vfx
-        my.vfx.walking = this.add.particles(0, 5, "kenny-particles", {
-            frame: ['smoke_01.png', 'smoke_01.png', "smoke_01.png"],
-            scale: {start: 0.01, end: 0.03},
+        // Set up movement VFX
+        this.my.vfx.walking = this.add.particles(0, 5, "kenny-particles", {
+            frame: ['smoke_01.png'],
+            scale: { start: 0.01, end: 0.03 },
             lifespan: 200,
-            alpha: {start: 1, end: 0.1}, 
+            alpha: { start: 1, end: 0.1 },
         });
+        this.my.vfx.walking.stop();
 
-        my.vfx.walking.stop();
-
-        // set up camera
+        // Set up camera
         this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
-        this.cameras.main.startFollow(my.sprite.player, true, 0.25, 0.25); // (target, [,roundPixels][,lerpX][,lerpY])
+        this.cameras.main.startFollow(this.my.sprite.player, true, 0.25, 0.25);
         this.cameras.main.setDeadzone(50, 50);
         this.cameras.main.setZoom(this.SCALE);
 
-        // set game world bounds
+        // Set game world bounds
         this.physics.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
 
         // Create the gun sprite and scale it down
@@ -104,55 +87,63 @@ class Platformer extends Phaser.Scene {
         this.input.on('pointerup', this.stopShooting, this);
 
         this.isShooting = false;
-        this.ammo = this.MAG_SIZE; // Initialize ammo
+        this.ammo = this.MAG_SIZE;
         this.reloading = false;
 
-        // Add ammo text display
-        this.ammoText = this.add.text(10, 10, 'Ammo: ' + this.ammo, { font: '16px Arial', fill: '#ffffff' });
+        // Add bitmap text display for ammo
+        this.my.text.ammo = this.add.bitmapText(this.cameras.main.centerX + (this.cameras.main.displayWidth / 2), this.cameras.main.centerY - (this.cameras.main.displayHeight / 2), "platformerNums", "Ammo: " + this.ammo, 18)
+            .setOrigin(1, 0)
+            .setDepth(2)
+            .setScrollFactor(0);
+        this.my.text.ammoText = this.add.bitmapText(this.cameras.main.centerX + (this.cameras.main.displayWidth / 2) - 30, this.cameras.main.centerY - (this.cameras.main.displayHeight / 2), "tinyText", "ammo: ", 18)
+            .setOrigin(1, 0)
+            .setDepth(2)
+            .setScrollFactor(0);
 
         // Load audio
         this.jumpSound = this.sound.add('jump');
         this.shootSound = this.sound.add('shoot');
         this.impactSound = this.sound.add('impact');
-        this.reloadSound = this.sound.add('reload'); // Reload sound
+        this.reloadSound = this.sound.add('reload');
     }
 
     update() {
+        // Handle player movement and animations
         if (this.aKey.isDown) {
-            my.sprite.player.setAccelerationX(-this.ACCELERATION);
-            my.sprite.player.resetFlip();
-            my.sprite.player.anims.play('walk', true);
-            my.vfx.walking.startFollow(my.sprite.player, my.sprite.player.displayWidth / 2 - 10, my.sprite.player.displayHeight / 2 - 5, false);
-            my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
+            this.my.sprite.player.setAccelerationX(-this.ACCELERATION);
+            this.my.sprite.player.resetFlip();
+            this.my.sprite.player.anims.play('walk', true);
+            this.my.vfx.walking.startFollow(this.my.sprite.player, this.my.sprite.player.displayWidth / 2 - 10, this.my.sprite.player.displayHeight / 2 - 5, false);
+            this.my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
 
-            if (my.sprite.player.body.blocked.down) {
-                my.vfx.walking.start();
+            if (this.my.sprite.player.body.blocked.down) {
+                this.my.vfx.walking.start();
             }
 
         } else if (this.dKey.isDown) {
-            my.sprite.player.setAccelerationX(this.ACCELERATION);
-            my.sprite.player.setFlip(true, false);
-            my.sprite.player.anims.play('walk', true);
-            my.vfx.walking.startFollow(my.sprite.player, my.sprite.player.displayWidth / 2 - 10, my.sprite.player.displayHeight / 2 - 5, false);
-            my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
+            this.my.sprite.player.setAccelerationX(this.ACCELERATION);
+            this.my.sprite.player.setFlip(true, false);
+            this.my.sprite.player.anims.play('walk', true);
+            this.my.vfx.walking.startFollow(this.my.sprite.player, this.my.sprite.player.displayWidth / 2 - 10, this.my.sprite.player.displayHeight / 2 - 5, false);
+            this.my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
 
-            if (my.sprite.player.body.blocked.down) {
-                my.vfx.walking.start();
+            if (this.my.sprite.player.body.blocked.down) {
+                this.my.vfx.walking.start();
             }
 
         } else {
-            my.sprite.player.setAccelerationX(0);
-            my.sprite.player.setDragX(this.DRAG);
-            my.sprite.player.anims.play('idle');
-            my.vfx.walking.stop();
+            this.my.sprite.player.setAccelerationX(0);
+            this.my.sprite.player.setDragX(this.DRAG);
+            this.my.sprite.player.anims.play('idle');
+            this.my.vfx.walking.stop();
         }
 
-        // player jump
-        if (!my.sprite.player.body.blocked.down) {
-            my.sprite.player.anims.play('jump');
+        // Player jump
+        if (!this.my.sprite.player.body.blocked.down) {
+            this.my.sprite.player.anims.play('jump');
         }
-        if (my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-            my.sprite.player.body.setVelocityY(this.JUMP_VELOCITY);
+        if (this.my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+            this.my.sprite.player.body.setVelocityY(this.JUMP_VELOCITY);
             this.jumpSound.play();
         }
 
@@ -174,16 +165,16 @@ class Platformer extends Phaser.Scene {
         }
 
         // Update ammo text display
-        this.ammoText.setText('Ammo: ' + this.ammo);
+        this.my.text.ammo.setText('Ammo ' + this.ammo);
     }
 
     updateGunPosition() {
         const pointer = this.input.activePointer;
-        const angle = Phaser.Math.Angle.Between(my.sprite.player.x, my.sprite.player.y, pointer.worldX, pointer.worldY);
-        this.gun.setPosition(my.sprite.player.x, my.sprite.player.y + 8);
+        const angle = Phaser.Math.Angle.Between(this.my.sprite.player.x, this.my.sprite.player.y, pointer.worldX, pointer.worldY);
+        this.gun.setPosition(this.my.sprite.player.x, this.my.sprite.player.y + 8);
         this.gun.setRotation(angle);
 
-        if (pointer.worldX < my.sprite.player.x) {
+        if (pointer.worldX < this.my.sprite.player.x) {
             this.gun.setFlipY(true);
         } else {
             this.gun.setFlipY(false);
@@ -215,8 +206,8 @@ class Platformer extends Phaser.Scene {
         const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0xffff00 } });
 
         // Starting point of the bullet
-        const startX = my.sprite.player.x;
-        const startY = my.sprite.player.y + 8;
+        const startX = this.my.sprite.player.x;
+        const startY = this.my.sprite.player.y + 8;
 
         // Calculate the bullet direction
         const angle = Phaser.Math.Angle.Between(startX, startY, this.input.activePointer.worldX, this.input.activePointer.worldY);
@@ -303,6 +294,10 @@ class Platformer extends Phaser.Scene {
 
         this.reloading = true;
         this.reloadSound.play();
+        this.my.text.ammoText.setText("reload");
+        setTimeout(() => {
+            this.my.text.ammoText.setText("ammo: ");
+        }, 1000);
         this.time.delayedCall(3000, () => {
             this.ammo = this.MAG_SIZE;
             this.reloading = false;
