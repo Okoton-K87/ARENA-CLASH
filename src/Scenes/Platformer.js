@@ -3,6 +3,14 @@ class Platformer extends Phaser.Scene {
         super("platformerScene");
     }
 
+    preload() {
+        // Load audio files
+        this.load.audio('jump', 'assets/audio/jump.mp3');
+        this.load.audio('shoot', 'assets/audio/shoot.mp3');
+        this.load.audio('impact', 'assets/audio/impact.mp3');
+        this.load.audio('reload', 'assets/audio/reload.mp3'); // Make sure the file path is correct
+    }
+
     init() {
         // variables and settings
         this.ACCELERATION = 400;
@@ -11,7 +19,8 @@ class Platformer extends Phaser.Scene {
         this.JUMP_VELOCITY = -600;
         this.PARTICLE_VELOCITY = 50;
         this.SCALE = 2.0;
-        this.ATTACK_SPEED = 50; // Attack speed in milliseconds
+        this.ATTACK_SPEED = 75; // Attack speed in milliseconds
+        this.MAG_SIZE = 50;     // Magazine size
     }
 
     create() {
@@ -59,7 +68,7 @@ class Platformer extends Phaser.Scene {
         this.aKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
+        this.rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R); // Reload key
         this.pKey = this.input.keyboard.addKey('P');
 
         // debug key listener (assigned to D key)
@@ -95,11 +104,17 @@ class Platformer extends Phaser.Scene {
         this.input.on('pointerup', this.stopShooting, this);
 
         this.isShooting = false;
+        this.ammo = this.MAG_SIZE; // Initialize ammo
+        this.reloading = false;
+
+        // Add ammo text display
+        this.ammoText = this.add.text(10, 10, 'Ammo: ' + this.ammo, { font: '16px Arial', fill: '#ffffff' });
 
         // Load audio
         this.jumpSound = this.sound.add('jump');
-        this.shootSound = this.sound.add('shoot', { loop: true });
+        this.shootSound = this.sound.add('shoot');
         this.impactSound = this.sound.add('impact');
+        this.reloadSound = this.sound.add('reload'); // Reload sound
     }
 
     update() {
@@ -145,6 +160,11 @@ class Platformer extends Phaser.Scene {
             this.scene.restart();
         }
 
+        // Reload when 'R' key is pressed or auto-reload when out of ammo
+        if (Phaser.Input.Keyboard.JustDown(this.rKey) || (this.ammo <= 0 && !this.reloading)) {
+            this.reload();
+        }
+
         // Update gun position and rotation
         this.updateGunPosition();
 
@@ -152,6 +172,9 @@ class Platformer extends Phaser.Scene {
         if (this.isShooting) {
             this.shoot();
         }
+
+        // Update ammo text display
+        this.ammoText.setText('Ammo: ' + this.ammo);
     }
 
     updateGunPosition() {
@@ -168,9 +191,11 @@ class Platformer extends Phaser.Scene {
     }
 
     startShooting() {
-        this.isShooting = true;
-        this.lastShotTime = 0;
-        this.shootSound.play();
+        if (this.ammo > 0 && !this.reloading) {
+            this.isShooting = true;
+            this.lastShotTime = 0;
+            this.shootSound.play();
+        }
     }
 
     stopShooting() {
@@ -181,7 +206,7 @@ class Platformer extends Phaser.Scene {
     shoot() {
         const now = this.time.now;
 
-        if (now - this.lastShotTime < this.ATTACK_SPEED) {
+        if (now - this.lastShotTime < this.ATTACK_SPEED || this.ammo <= 0) {
             return;
         }
 
@@ -263,6 +288,28 @@ class Platformer extends Phaser.Scene {
                 graphics.destroy();
             }
         });
+
+        this.ammo--; // Decrease ammo count
+
+        // Auto-reload if out of ammo
+        if (this.ammo <= 0) {
+            this.reload();
+        }
+    }
+
+    reload() {
+        if (this.reloading) return;
+        this.shootSound.stop();
+
+        this.reloading = true;
+        this.reloadSound.play();
+        this.time.delayedCall(3000, () => {
+            this.ammo = this.MAG_SIZE;
+            this.reloading = false;
+            if (this.isShooting) {
+                this.shootSound.play(); // Resume shooting sound if still shooting
+            }
+        }, [], this);
     }
 
     getLineIntersection(line, rect) {
