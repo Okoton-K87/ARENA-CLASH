@@ -17,7 +17,8 @@ class Platformer extends Phaser.Scene {
         this.SCALE = 2.5;
         this.ATTACK_SPEED = 75;
         this.MAG_SIZE = 50;
-        this.PLAYER_HEALTH = 100; // Player's health
+        this.PLAYER_HEALTH = 100; // Player's health set to 100
+        this.playerDefeated = false; // Track if player is defeated
     }
 
     create() {
@@ -42,9 +43,7 @@ class Platformer extends Phaser.Scene {
         // Set up targets array
         this.targets = [];
         const target1 = this.createTarget(400, 345);
-        const target2 = this.createTarget(450, 345);
-
-        this.targets.push(target1, target2);
+        this.targets.push(target1);
 
         // Enable collision handling
         this.physics.add.collider(this.my.sprite.player, this.groundLayer);
@@ -102,6 +101,13 @@ class Platformer extends Phaser.Scene {
             .setDepth(2)
             .setScrollFactor(0);
 
+        // Defeat message
+        this.my.text.defeat = this.add.bitmapText(this.cameras.main.centerX, this.cameras.main.centerY, "tinyText", "defeat", 32)
+            .setOrigin(0.5)
+            .setDepth(3)
+            .setScrollFactor(0)
+            .setVisible(false);
+
         // Load audio
         this.jumpSound = this.sound.add('jump');
         this.shootSound = this.sound.add('shoot');
@@ -117,10 +123,29 @@ class Platformer extends Phaser.Scene {
         target.direction = Phaser.Math.Between(0, 1) === 0 ? -1 : 1;
         target.speed = 50;
         target.anims.play('target_idle');
+
+        // Gun and shooting variables for target
+        target.gun = this.add.sprite(target.x, target.y, 'gun').setOrigin(0.5, 0.5).setScale(0.4);
+        target.isShooting = false;
+        target.ammo = 30; // Different from player
+        target.reloading = false;
+        target.lastShotTime = 0;
+        target.ATTACK_SPEED = 75; // Set target attack speed to 75
+        target.MAG_SIZE = 50; // Different from player
+
         return target;
     }
 
     update() {
+        if (this.playerDefeated) {
+            this.targets.forEach(target => {
+                target.setVelocityX(0); // Stop target movement
+                this.updateTargetHealthBar(target);
+                this.updateTargetGunPosition(target);
+            });
+            return; // Skip rest of the update if player is defeated
+        }
+
         // Handle player movement and animations
         if (this.aKey.isDown) {
             this.my.sprite.player.setAccelerationX(-this.ACCELERATION);
@@ -188,6 +213,13 @@ class Platformer extends Phaser.Scene {
                 this.updateTargetAI(target);
             }
         });
+
+        // Check for player defeat
+        if (this.my.sprite.player.health <= 0) {
+            this.my.sprite.player.health = 0; // Ensure health is set to 0
+            this.updateHealthText(); // Update the health text immediately
+            this.gameOver();
+        }
     }
 
     updateGunPosition() {
@@ -204,7 +236,7 @@ class Platformer extends Phaser.Scene {
     }
 
     startShooting() {
-        if (this.ammo > 0 && !this.reloading) {
+        if (this.ammo > 0 && !this.reloading && !this.playerDefeated) {
             this.isShooting = true;
             this.lastShotTime = 0;
             this.shootSound.play();
@@ -286,6 +318,7 @@ class Platformer extends Phaser.Scene {
                 if (closestTarget.health <= 0) {
                     closestTarget.destroy();
                     closestTarget.healthBar.destroy();
+                    closestTarget.gun.destroy(); // Destroy the gun when the target dies
                 }
             }
         }
@@ -297,7 +330,7 @@ class Platformer extends Phaser.Scene {
         this.tweens.add({
             targets: graphics,
             alpha: 0,
-            duration: 10,
+            duration: 10, // Increase the duration for better visibility
             onComplete: () => {
                 graphics.destroy();
             }
@@ -312,7 +345,7 @@ class Platformer extends Phaser.Scene {
     }
 
     reload() {
-        if (this.reloading) return;
+        if (this.reloading || this.playerDefeated) return;
         this.shootSound.stop();
 
         this.reloading = true;
@@ -412,5 +445,175 @@ class Platformer extends Phaser.Scene {
         } else {
             target.anims.play('target_idle', true);
         }
+
+        // Target shooting
+        if (this.canSeePlayer(target) && !target.reloading) {
+            this.targetStartShooting(target);
+        }
+
+        if (target.isShooting) {
+            this.targetShoot(target);
+        }
+
+        // Reload if out of ammo
+        if (target.ammo <= 0 && !target.reloading) {
+            this.targetReload(target);
+        }
+
+        // Update target gun position
+        this.updateTargetGunPosition(target);
+    }
+
+    canSeePlayer(target) {
+        const lineOfSight = new Phaser.Geom.Line(target.x, target.y, this.my.sprite.player.x, this.my.sprite.player.y);
+        const tiles = this.groundLayer.getTilesWithinShape(lineOfSight);
+
+        for (let tile of tiles) {
+            if (tile.collides) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    updateTargetGunPosition(target) {
+        const angle = Phaser.Math.Angle.Between(target.x, target.y, this.my.sprite.player.x, this.my.sprite.player.y);
+        target.gun.setPosition(target.x, target.y + 8);
+        target.gun.setRotation(angle);
+
+        if (this.my.sprite.player.x < target.x) {
+            target.gun.setFlipY(true);
+        } else {
+            target.gun.setFlipY(false);
+        }
+    }
+
+    targetStartShooting(target) {
+        if (target.ammo > 0 && !target.reloading) {
+            target.isShooting = true;
+        }
+    }
+
+    targetStopShooting(target) {
+        target.isShooting = false;
+    }
+
+    targetShoot(target) {
+        const now = this.time.now;
+
+        if (now - target.lastShotTime < target.ATTACK_SPEED || target.ammo <= 0) {
+            return;
+        }
+
+        target.lastShotTime = now;
+
+        const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0x00ffff } });
+
+        // Starting point of the bullet
+        const startX = target.x;
+        const startY = target.y + 8;
+
+        // Calculate the bullet direction
+        const angle = Phaser.Math.Angle.Between(startX, startY, this.my.sprite.player.x, this.my.sprite.player.y);
+        const velocity = new Phaser.Math.Vector2();
+        this.physics.velocityFromRotation(angle, 1000, velocity);
+
+        // Calculate the endpoint of the bullet trace
+        let endX = startX + velocity.x;
+        let endY = startY + velocity.y;
+
+        // Variable to store the closest intersection point
+        let closestIntersection = null;
+        let closestDist = Infinity;
+        let hitPlayer = false;
+
+        // Check if the bullet hits the player
+        const playerBounds = this.my.sprite.player.getBounds();
+        const line = new Phaser.Geom.Line(startX, startY, endX, endY);
+        if (Phaser.Geom.Intersects.LineToRectangle(line, playerBounds)) {
+            const intersection = this.getLineIntersection(line, playerBounds);
+            if (intersection) {
+                endX = intersection.x;
+                endY = intersection.y;
+                hitPlayer = true;
+            }
+        }
+
+        // Check if the bullet hits any map tiles
+        const tileHits = this.mapLayerIntersects(startX, startY, endX, endY);
+        if (tileHits) {
+            const dist = Phaser.Math.Distance.Between(startX, startY, tileHits.x, tileHits.y);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestIntersection = tileHits;
+            }
+        }
+
+        if (closestIntersection) {
+            endX = closestIntersection.x;
+            endY = closestIntersection.y;
+            hitPlayer = false; // If it hits a wall, it doesn't hit the player
+        }
+
+        // Draw the bullet trace
+        graphics.lineBetween(startX, startY, endX, endY);
+
+        // Create an animation effect for the bullet travel
+        this.tweens.add({
+            targets: graphics,
+            alpha: 0,
+            duration: 10, // Increase the duration for better visibility
+            onComplete: () => {
+                graphics.destroy();
+            }
+        });
+
+        if (hitPlayer) {
+            this.my.sprite.player.health -= 5;
+            this.updateHealthText(); // Update health text after taking damage
+        }
+
+        target.ammo--; // Decrease ammo count
+
+        // Stop shooting if out of ammo
+        if (target.ammo <= 0) {
+            this.targetStopShooting(target);
+        }
+    }
+
+    targetReload(target) {
+        target.reloading = true;
+        setTimeout(() => {
+            target.ammo = target.MAG_SIZE;
+            target.reloading = false;
+        }, 3000); // Adjust the reload time if necessary
+    }
+
+    updateHealthText() {
+        this.my.text.health.setText('L' + this.my.sprite.player.health);
+    }
+
+    gameOver() {
+        this.playerDefeated = true;
+        this.my.text.defeat.setVisible(true);
+
+        // Stop all player actions
+        this.isShooting = false;
+        this.shootSound.stop();
+
+        // Update the health display to show 0
+        this.updateHealthText();
+
+        // Remove player and gun sprites
+        this.my.sprite.player.setVisible(false);
+        this.my.sprite.player.disableBody(true, true);
+        this.gun.setVisible(false);
+
+        // Stop targets from shooting and moving
+        this.targets.forEach(target => {
+            target.isShooting = false;
+            target.setVelocityX(0);
+        });
     }
 }
