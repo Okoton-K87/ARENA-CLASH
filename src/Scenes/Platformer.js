@@ -154,7 +154,7 @@ class Platformer extends Phaser.Scene {
         target.direction = Phaser.Math.Between(0, 1) === 0 ? -1 : 1;
         target.speed = 50;
         target.anims.play('target_idle');
-
+    
         // Gun and shooting variables for target
         target.gun = this.add.sprite(target.x, target.y, 'gun').setOrigin(0.5, 0.5).setScale(0.4);
         target.isShooting = false;
@@ -163,9 +163,9 @@ class Platformer extends Phaser.Scene {
         target.lastShotTime = 0;
         target.ATTACK_SPEED = 75; // Set target attack speed to 75
         target.MAG_SIZE = 50; // Different from player
-
+    
         return target;
-    }
+    }    
 
     update() {
         if (this.playerDefeated) {
@@ -519,31 +519,31 @@ class Platformer extends Phaser.Scene {
             target.flipX = target.direction === 1; // Flip the sprite based on direction
         }
         target.setVelocityX(target.direction * target.speed);
-
+    
         // Update target animation based on movement
         if (target.body.velocity.x !== 0) {
             target.anims.play('target_walk', true);
         } else {
             target.anims.play('target_idle', true);
         }
-
+    
         // Target shooting
         if (this.canSeePlayer(target) && !target.reloading) {
             this.targetStartShooting(target);
         }
-
+    
         if (target.isShooting) {
             this.targetShoot(target);
         }
-
+    
         // Reload if out of ammo
         if (target.ammo <= 0 && !target.reloading) {
             this.targetReload(target);
         }
-
+    
         // Update target gun position
         this.updateTargetGunPosition(target);
-    }
+    }    
 
     canSeePlayer(target) {
         const lineOfSight = new Phaser.Geom.Line(target.x, target.y, this.my.sprite.player.x, this.my.sprite.player.y);
@@ -559,16 +559,16 @@ class Platformer extends Phaser.Scene {
     }
 
     updateTargetGunPosition(target) {
-        const angle = Phaser.Math.Angle.Between(target.x, target.y, this.my.sprite.player.x);
+        const angle = Phaser.Math.Angle.Between(target.x, target.y, this.my.sprite.player.x, this.my.sprite.player.y);
         target.gun.setPosition(target.x, target.y + 8);
         target.gun.setRotation(angle);
-
+    
         if (this.my.sprite.player.x < target.x) {
             target.gun.setFlipY(true);
         } else {
             target.gun.setFlipY(false);
         }
-    }
+    }    
 
     targetStartShooting(target) {
         if (target.ammo > 0 && !target.reloading) {
