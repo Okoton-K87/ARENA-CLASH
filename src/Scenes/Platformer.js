@@ -5,6 +5,7 @@ class Platformer extends Phaser.Scene {
 
     preload() {
         // Load audio files (already done in Load.js)
+        // this.loaed.image('heal_plus', 'path/to/plus/image.png'); // Load the plus image
     }
 
     init() {
@@ -19,6 +20,11 @@ class Platformer extends Phaser.Scene {
         this.MAG_SIZE = 50;
         this.PLAYER_HEALTH = 100; // Player's health set to 100
         this.playerDefeated = false; // Track if player is defeated
+        this.HEAL_AMOUNT = 50; // Amount to heal
+        this.HEAL_DURATION = 2000; // Duration of healing in milliseconds
+        this.HEAL_COOLDOWN = 10000; // Cooldown in milliseconds
+        this.healing = false;
+        this.healingCooldown = false;
     }
 
     create() {
@@ -60,6 +66,7 @@ class Platformer extends Phaser.Scene {
         this.dKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R); // Reload key
+        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E); // Heal key
         this.pKey = this.input.keyboard.addKey('P');
 
         // Set up movement VFX
@@ -70,6 +77,15 @@ class Platformer extends Phaser.Scene {
             alpha: { start: 1, end: 0.1 },
         });
         this.my.vfx.walking.stop();
+
+        // Set up healing VFX
+        this.my.vfx.healing = this.add.particles(0, 0, "kenny-particles", {
+            frame: ['spark_04.png', 'spark_03.png', 'spark_01.png', 'spark_02.png'],
+            scale: { start: 0.1, end: 0.2},
+            lifespan: 50,
+            alpha: { start: 1, end: 0.1 },
+        });
+        this.my.vfx.healing.stop();
 
         // Set up camera
         this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
@@ -106,6 +122,15 @@ class Platformer extends Phaser.Scene {
             .setDepth(2)
             .setScrollFactor(0);
 
+        // Add bitmap text display for heal ability cooldown
+        this.my.text.heal = this.add.bitmapText(this.cameras.main.centerX - (this.cameras.main.displayWidth / 2) + 240, this.cameras.main.centerY - (this.cameras.main.displayHeight / 2), "platformerNums", "ready", 18)
+            .setDepth(2)
+            .setScrollFactor(0);
+
+        this.my.text.healText = this.add.bitmapText(this.cameras.main.centerX - (this.cameras.main.displayWidth / 2) + 150, this.cameras.main.centerY - (this.cameras.main.displayHeight / 2), "tinyText", " ", 18)
+            .setDepth(2)
+            .setScrollFactor(0);
+
         // Defeat message
         this.my.text.defeat = this.add.bitmapText(this.cameras.main.centerX, this.cameras.main.centerY, "tinyText", "defeat", 32)
             .setOrigin(0.5)
@@ -118,6 +143,7 @@ class Platformer extends Phaser.Scene {
         this.shootSound = this.sound.add('shoot');
         this.impactSound = this.sound.add('impact');
         this.reloadSound = this.sound.add('reload');
+        this.healSound = this.sound.add('heal'); // Placeholder for heal sound
     }
 
     createTarget(x, y) {
@@ -135,7 +161,7 @@ class Platformer extends Phaser.Scene {
         target.ammo = 30; // Different from player
         target.reloading = false;
         target.lastShotTime = 0;
-        target.ATTACK_SPEED = 45; // Set target attack speed to 75
+        target.ATTACK_SPEED = 75; // Set target attack speed to 75
         target.MAG_SIZE = 50; // Different from player
 
         return target;
@@ -194,6 +220,11 @@ class Platformer extends Phaser.Scene {
             this.scene.restart();
         }
 
+        // Handle healing ability
+        if (Phaser.Input.Keyboard.JustDown(this.eKey) && !this.healing && !this.healingCooldown) {
+            this.startHealing();
+        }
+
         // Reload when 'R' key is pressed or auto-reload when out of ammo
         if (Phaser.Input.Keyboard.JustDown(this.rKey) || (this.ammo <= 0 && !this.reloading)) {
             this.reload();
@@ -210,6 +241,16 @@ class Platformer extends Phaser.Scene {
         // Update ammo and health text display
         this.my.text.ammo.setText('Ammo ' + this.ammo);
         this.my.text.health.setText('L' + this.my.sprite.player.health);
+
+        // Update heal ability cooldown text display
+        if (this.healingCooldown) {
+            const remaining = Math.max(0, this.HEAL_COOLDOWN - (this.time.now - this.healingStartTime));
+            this.my.text.healText.setText('heal: ');
+            this.my.text.heal.setText(Math.ceil(remaining / 1000));
+        } else {
+            this.my.text.healText.setText('heal: ');
+            this.my.text.heal.setText("L");
+        }
 
         // Update target health bars and AI
         this.targets.forEach(target => {
@@ -368,6 +409,41 @@ class Platformer extends Phaser.Scene {
         }, [], this);
     }
 
+    startHealing() {
+        this.healing = true;
+        this.healingCooldown = true;
+        this.healingStartTime = this.time.now;
+        this.healSound.play(); // Play heal sound
+        this.my.vfx.healing.start();
+        this.my.vfx.healing.startFollow(this.my.sprite.player);
+
+        this.time.addEvent({
+            delay: this.HEAL_DURATION / 10, // Spread healing over time
+            repeat: 9, // Repeat 9 more times for a total of 10 ticks
+            callback: () => {
+                if (this.my.sprite.player.health < this.PLAYER_HEALTH && this.playerDefeated != true) {
+                    this.my.sprite.player.health += this.HEAL_AMOUNT / 10;
+                    if (this.my.sprite.player.health > this.PLAYER_HEALTH) {
+                        this.my.sprite.player.health = this.PLAYER_HEALTH;
+                    }
+                    this.updateHealthText(); // Update health text after healing
+                } else {
+                    this.my.vfx.healing.stop();
+                }
+            },
+            callbackScope: this
+        });
+
+        this.time.delayedCall(this.HEAL_DURATION, () => {
+            this.healing = false;
+            this.my.vfx.healing.stop();
+        }, [], this);
+
+        this.time.delayedCall(this.HEAL_COOLDOWN, () => {
+            this.healingCooldown = false;
+        }, [], this);
+    }
+
     getLineIntersection(line, rect) {
         let closestPoint = null;
         let closestDist = Infinity;
@@ -483,7 +559,7 @@ class Platformer extends Phaser.Scene {
     }
 
     updateTargetGunPosition(target) {
-        const angle = Phaser.Math.Angle.Between(target.x, target.y, this.my.sprite.player.x, this.my.sprite.player.y);
+        const angle = Phaser.Math.Angle.Between(target.x, target.y, this.my.sprite.player.x);
         target.gun.setPosition(target.x, target.y + 8);
         target.gun.setRotation(angle);
 

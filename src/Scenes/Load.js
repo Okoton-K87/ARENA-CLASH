@@ -31,6 +31,7 @@ class Load extends Phaser.Scene {
         this.load.audio("shoot", "P90.mp3");
         this.load.audio("impact", "impactGlass_light_000.ogg");
         this.load.audio("reload", "P90_reload.mp3");
+        this.load.audio("heal", "healing_stim.mp3");
 
         // Load bitmap fonts
         this.load.bitmapFont("platformerNums", "platformerNums.png", "platformerNums.xml");
