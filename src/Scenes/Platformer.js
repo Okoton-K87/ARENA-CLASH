@@ -27,9 +27,14 @@ class Platformer extends Phaser.Scene {
 
         // Add a tileset to the map
         this.tileset = this.map.addTilesetImage("kenny_tilemap_packed", "tilemap_tiles");
+        this.bgTileset = this.map.addTilesetImage("tilemap_backgrounds_packed", "background_tiles");
 
         // Create a layer
+        this.bgLayer = this.map.createLayer("Background", this.bgTileset, 0, 0).setScrollFactor(0.25);
         this.groundLayer = this.map.createLayer("Ground-n-Platforms", this.tileset, 0, 0);
+
+        // Adjust the position of the bgLayer
+        this.bgLayer.setPosition(400, 150);
 
         // Make it collidable
         this.groundLayer.setCollisionByProperty({ collides: true });
@@ -130,7 +135,7 @@ class Platformer extends Phaser.Scene {
         target.ammo = 30; // Different from player
         target.reloading = false;
         target.lastShotTime = 0;
-        target.ATTACK_SPEED = 75; // Set target attack speed to 75
+        target.ATTACK_SPEED = 45; // Set target attack speed to 75
         target.MAG_SIZE = 50; // Different from player
 
         return target;
@@ -350,7 +355,7 @@ class Platformer extends Phaser.Scene {
 
         this.reloading = true;
         this.reloadSound.play();
-        this.my.text.ammoText.setText("reload");
+        this.my.text.ammoText.setText("reload ");
         setTimeout(() => {
             this.my.text.ammoText.setText("ammo: ");
         }, 3000);
