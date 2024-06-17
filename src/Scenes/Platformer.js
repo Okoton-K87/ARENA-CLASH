@@ -4,8 +4,9 @@ class Platformer extends Phaser.Scene {
     }
 
     preload() {
+        // Load the necessary assets here
         // Load audio files (already done in Load.js)
-        // this.loaed.image('heal_plus', 'path/to/plus/image.png'); // Load the plus image
+        // this.load.image('heal_plus', 'path/to/plus/image.png'); // Load the plus image
     }
 
     init() {
@@ -29,18 +30,19 @@ class Platformer extends Phaser.Scene {
 
     create() {
         // Create a new tilemap game object which uses 18x18 pixel tiles
-        this.map = this.add.tilemap("platformer-level-1", 18, 18, 45, 25);
+        this.map = this.add.tilemap("platformer-level-1", 18, 18, 120, 20);
 
         // Add a tileset to the map
-        this.tileset = this.map.addTilesetImage("kenny_tilemap_packed", "tilemap_tiles");
+        this.tileset = this.map.addTilesetImage("kenny_tiledmap_packed", "tilemap_tiles");
         this.bgTileset = this.map.addTilesetImage("tilemap_backgrounds_packed", "background_tiles");
 
         // Create a layer
-        this.bgLayer = this.map.createLayer("Background", this.bgTileset, 0, 0).setScrollFactor(0.25);
+        this.bgLayer = this.map.createLayer("Background", this.bgTileset, 0, 0).setScrollFactor(0.8);
+        this.mgLayer = this.map.createLayer("Midground", this.tileset, 0, 0);
         this.groundLayer = this.map.createLayer("Ground-n-Platforms", this.tileset, 0, 0);
 
         // Adjust the position of the bgLayer
-        this.bgLayer.setPosition(400, 150);
+        this.bgLayer.setPosition(110, 50);
 
         // Make it collidable
         this.groundLayer.setCollisionByProperty({ collides: true });
@@ -53,8 +55,11 @@ class Platformer extends Phaser.Scene {
 
         // Set up targets array
         this.targets = [];
-        const target1 = this.createTarget(400, 345);
-        this.targets.push(target1);
+        const target1 = this.createTarget(400, 100);
+        const target2 = this.createTarget(500, 100);
+        const target3 = this.createTarget(600, 100);
+        const target4 = this.createTarget(800, 100);
+        this.targets.push(target1, target2, target3, target4);
 
         // Enable collision handling
         this.physics.add.collider(this.my.sprite.player, this.groundLayer);
@@ -156,7 +161,7 @@ class Platformer extends Phaser.Scene {
         target.anims.play('target_idle');
     
         // Gun and shooting variables for target
-        target.gun = this.add.sprite(target.x, target.y, 'gun').setOrigin(0.5, 0.5).setScale(0.4);
+        target.gun = this.add.sprite(target.x, target.y, 'gun2').setOrigin(0.5, 0.5).setScale(0.4);
         target.isShooting = false;
         target.ammo = 30; // Different from player
         target.reloading = false;
@@ -170,9 +175,11 @@ class Platformer extends Phaser.Scene {
     update() {
         if (this.playerDefeated) {
             this.targets.forEach(target => {
-                target.setVelocityX(0); // Stop target movement
-                this.updateTargetHealthBar(target);
-                this.updateTargetGunPosition(target);
+                if (target && target.setVelocityX) { // Check if the target and its method exist before calling it
+                    // target.setVelocityX(0); // Stop target movement
+                    this.updateTargetHealthBar(target);
+                    this.updateTargetGunPosition(target);
+                }
             });
             return; // Skip rest of the update if player is defeated
         }
@@ -593,7 +600,7 @@ class Platformer extends Phaser.Scene {
 
         // Starting point of the bullet
         const startX = target.x;
-        const startY = target.y + 8;
+        const startY = target.y + 7;
 
         // Calculate the bullet direction
         const angle = Phaser.Math.Angle.Between(startX, startY, this.my.sprite.player.x, this.my.sprite.player.y);
@@ -678,23 +685,26 @@ class Platformer extends Phaser.Scene {
     gameOver() {
         this.playerDefeated = true;
         this.my.text.defeat.setVisible(true);
-
+    
         // Stop all player actions
         this.isShooting = false;
         this.shootSound.stop();
-
+    
         // Update the health display to show 0
         this.updateHealthText();
-
+    
         // Remove player and gun sprites
         this.my.sprite.player.setVisible(false);
         this.my.sprite.player.disableBody(true, true);
         this.gun.setVisible(false);
-
+    
         // Stop targets from shooting and moving
         this.targets.forEach(target => {
-            target.isShooting = false;
-            target.setVelocityX(0);
+            if (target && target.setVelocityX) { // Check if the target and its method exist before calling it
+                target.isShooting = false;
+                // target.setVelocityX(0);
+            }
         });
     }
+    
 }

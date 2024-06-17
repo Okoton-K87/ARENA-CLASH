@@ -25,6 +25,7 @@ class Load extends Phaser.Scene {
 
         // Load gun asset
         this.load.image("gun", "SMG-4.png");
+        this.load.image("gun2", "Assaut-rifle-1.png");
 
         // Load audio assets
         this.load.audio("jump", "jump.wav");

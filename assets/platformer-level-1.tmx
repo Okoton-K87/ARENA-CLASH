@@ -3,7 +3,7 @@
  <editorsettings>
   <export target="platformer-level-1.tmj" format="json"/>
  </editorsettings>
- <tileset firstgid="1" name="kenny_tilemap_packed" tilewidth="18" tileheight="18" tilecount="180" columns="20">
+ <tileset firstgid="1" name="kenny_tiledmap_packed" tilewidth="18" tileheight="18" tilecount="180" columns="20">
   <image source="tilemap_packed.png" width="360" height="162"/>
   <tile id="0">
    <properties>
