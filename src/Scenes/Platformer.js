@@ -74,9 +74,11 @@ class Platformer extends Phaser.Scene {
         const target14 = this.createTarget(1700, 125);
         const target15 = this.createTarget(2000, 100);
         const target16 = this.createTarget(2100, 175);
+        const target17 = this.createTarget(350, 320);
+        const target18 = this.createTarget(500, 320);
         this.targets.push(target01, target02, target03, target04, target05, target06);
         this.targets.push(target07, target08, target09, target10, target11, target12);
-        this.targets.push(target13, target14, target15, target16);
+        this.targets.push(target13, target14, target15, target16, target17, target18);
 
         // Enable collision handling
         this.physics.add.collider(this.my.sprite.player, this.groundLayer);
