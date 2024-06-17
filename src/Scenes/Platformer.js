@@ -19,7 +19,7 @@ class Platformer extends Phaser.Scene {
         this.SCALE = 2.5;
         this.ATTACK_SPEED = 75;
         this.MAG_SIZE = 50;
-        this.PLAYER_HEALTH = 100; // Player's health set to 100
+        this.PLAYER_HEALTH = 200; // Player's health set to 100
         this.playerDefeated = false; // Track if player is defeated
         this.HEAL_AMOUNT = 50; // Amount to heal
         this.HEAL_DURATION = 2000; // Duration of healing in milliseconds
@@ -49,17 +49,34 @@ class Platformer extends Phaser.Scene {
 
         // Set up player avatar
         this.my = { sprite: {}, text: {}, vfx: {} };
-        this.my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");
+        this.my.sprite.player = this.physics.add.sprite(50, 345, "platformer_characters", "tile_0000.png");
         this.my.sprite.player.setCollideWorldBounds(true);
         this.my.sprite.player.health = this.PLAYER_HEALTH;
 
         // Set up targets array
         this.targets = [];
-        const target1 = this.createTarget(400, 100);
-        const target2 = this.createTarget(500, 100);
-        const target3 = this.createTarget(600, 100);
-        const target4 = this.createTarget(800, 100);
-        this.targets.push(target1, target2, target3, target4);
+        const target01 = this.createTarget(300, 200);
+        const target02 = this.createTarget(400, 100);
+        const target03 = this.createTarget(600, 100);
+        const target04 = this.createTarget(600, 200);
+
+        const target05 = this.createTarget(750, 150);
+        const target06= this.createTarget(1050, 225);
+        const target07 = this.createTarget(1200, 200);
+        const target08 = this.createTarget(1450, 175);
+
+        const target09 = this.createTarget(1550, 225);
+        const target10 = this.createTarget(1550, 300);
+        const target11 = this.createTarget(1750, 300);
+        const target12 = this.createTarget(1860, 300);
+
+        const target13 = this.createTarget(1700, 75);
+        const target14 = this.createTarget(1700, 125);
+        const target15 = this.createTarget(2000, 100);
+        const target16 = this.createTarget(2100, 175);
+        this.targets.push(target01, target02, target03, target04, target05, target06);
+        this.targets.push(target07, target08, target09, target10, target11, target12);
+        this.targets.push(target13, target14, target15, target16);
 
         // Enable collision handling
         this.physics.add.collider(this.my.sprite.player, this.groundLayer);
@@ -596,7 +613,7 @@ class Platformer extends Phaser.Scene {
 
         target.lastShotTime = now;
 
-        const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0x00ffff } });
+        const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0xFFAA00} });
 
         // Starting point of the bullet
         const startX = target.x;
