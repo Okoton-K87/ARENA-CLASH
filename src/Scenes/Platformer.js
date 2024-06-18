@@ -7,6 +7,7 @@ class Platformer extends Phaser.Scene {
         // Load the necessary assets here
         // Load audio files (already done in Load.js)
         // this.load.image('heal_plus', 'path/to/plus/image.png'); // Load the plus image
+        this.load.scenePlugin('AnimatedTiles', './lib/AnimatedTiles.js', 'animatedTiles', 'animatedTiles')
     }
 
     init() {
@@ -23,7 +24,7 @@ class Platformer extends Phaser.Scene {
         this.playerDefeated = false; // Track if player is defeated
         this.HEAL_AMOUNT = 50; // Amount to heal
         this.HEAL_DURATION = 2000; // Duration of healing in milliseconds
-        this.HEAL_COOLDOWN = 10000; // Cooldown in milliseconds
+        this.HEAL_COOLDOWN = 3000; // Cooldown in milliseconds
         this.healing = false;
         this.healingCooldown = false;
     }
@@ -38,8 +39,8 @@ class Platformer extends Phaser.Scene {
 
         // Create a layer
         this.bgLayer = this.map.createLayer("Background", this.bgTileset, 0, 0).setScrollFactor(0.8);
-        this.mgLayer = this.map.createLayer("Midground", this.tileset, 0, 0);
-        this.groundLayer = this.map.createLayer("Ground-n-Platforms", this.tileset, 0, 0);
+        this.mgLayer = this.map.createLayer("Midground", this.tileset, 0, 0).setDepth(1);
+        this.groundLayer = this.map.createLayer("Ground-n-Platforms", this.tileset, 0, 0).setDepth(0);
 
         // Adjust the position of the bgLayer
         this.bgLayer.setPosition(110, 50);
@@ -49,7 +50,7 @@ class Platformer extends Phaser.Scene {
 
         // Set up player avatar
         this.my = { sprite: {}, text: {}, vfx: {} };
-        this.my.sprite.player = this.physics.add.sprite(50, 345, "platformer_characters", "tile_0000.png");
+        this.my.sprite.player = this.physics.add.sprite(50, 320, "platformer_characters", "tile_0000.png");
         this.my.sprite.player.setCollideWorldBounds(true);
         this.my.sprite.player.health = this.PLAYER_HEALTH;
 
@@ -162,12 +163,49 @@ class Platformer extends Phaser.Scene {
             .setScrollFactor(0)
             .setVisible(false);
 
+        // Add control instructions
+        this.my.text.instructions = this.add.bitmapText(this.cameras.main.centerX, this.cameras.main.centerY, "tinyText", 
+            "win: arrival at R\n\n" + 
+
+            "a: left\n" +
+            "d: right\n" +
+            "r: reload\n" +
+            "e: healing\n" +
+            "p: restart\n" +
+            "l-mouse: shoot", 18)
+            .setOrigin(0.5)
+            .setDepth(3)
+            .setScrollFactor(0);
+
+        // Make the instructions disappear after 2.5 seconds
+        this.time.delayedCall(3500, () => {
+            this.my.text.instructions.setVisible(false);
+        }, [], this);
+
+        // Create visible collision detector for win check
+        this.winDetector = this.add.rectangle(2142, 72, 32, 32, 0xff0000).setVisible(false);
+        this.physics.add.existing(this.winDetector);
+        this.winDetector.body.setAllowGravity(false); // Prevent the detector from falling
+        this.winDetector.body.setImmovable(true); // Make the detector immovable
+        this.physics.add.collider(this.winDetector, this.groundLayer); // Add collision with map terrain
+        this.physics.add.overlap(this.my.sprite.player, this.winDetector, this.winGame, null, this);
+
+        // Add win message UI (initially hidden)
+        this.my.text.win = this.add.bitmapText(this.cameras.main.centerX, this.cameras.main.centerY, "tinyText", "yippee!!!", 32)
+            .setOrigin(0.5)
+            .setDepth(3)
+            .setScrollFactor(0)
+            .setVisible(false);
+    
         // Load audio
         this.jumpSound = this.sound.add('jump');
         this.shootSound = this.sound.add('shoot');
         this.impactSound = this.sound.add('impact');
         this.reloadSound = this.sound.add('reload');
         this.healSound = this.sound.add('heal'); // Placeholder for heal sound
+
+        // Animation
+        this.animatedTiles.init(this.map); 
     }
 
     createTarget(x, y) {
@@ -329,7 +367,7 @@ class Platformer extends Phaser.Scene {
 
         this.lastShotTime = now;
 
-        const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0xffff00 } });
+        const graphics = this.add.graphics({ lineStyle: { width: 0.7, color: 0x00BFFF } });
 
         // Starting point of the bullet
         const startX = this.my.sprite.player.x;
@@ -418,7 +456,7 @@ class Platformer extends Phaser.Scene {
 
     reload() {
         if (this.reloading || this.playerDefeated) return;
-        this.shootSound.stop();
+        this.stopShooting();
 
         this.reloading = true;
         this.reloadSound.play();
@@ -724,6 +762,37 @@ class Platformer extends Phaser.Scene {
                 // target.setVelocityX(0);
             }
         });
+
+        // Back to main menu
+        this.time.delayedCall(2000, () => {
+            this.scene.start('MainMenu');
+        }, [], this);
+    }
+
+    winGame() {
+        this.my.text.win.setVisible(true);
+
+        // Stop all player actions
+        this.isShooting = false;
+        this.shootSound.stop();
+
+        // Remove player and gun sprites
+        this.my.sprite.player.setVisible(false);
+        this.my.sprite.player.disableBody(true, true);
+        this.gun.setVisible(false);
+
+        // Stop targets from shooting and moving
+        this.targets.forEach(target => {
+            if (target && target.setVelocityX) {
+                target.isShooting = false;
+                // target.setVelocityX(0);
+            }
+        });
+
+        // Back to main menu after 3 seconds
+        this.time.delayedCall(3000, () => {
+            this.scene.start('MainMenu');
+        }, [], this);
     }
     
 }

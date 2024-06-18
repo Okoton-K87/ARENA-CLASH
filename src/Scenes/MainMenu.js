@@ -10,7 +10,7 @@ class MainMenu extends Phaser.Scene {
     create() {
         // Add the title text
         this.my = { text: {} };
-        this.my.text.title = this.add.bitmapText(this.cameras.main.centerX, this.cameras.main.centerY - 100, "tinyText", "arena clash", 32)
+        this.my.text.title = this.add.bitmapText(this.cameras.main.centerX, this.cameras.main.centerY - 100, "tinyText", "arena clash", 64)
             .setOrigin(0.5)
             .setDepth(3)
             .setScrollFactor(0);
