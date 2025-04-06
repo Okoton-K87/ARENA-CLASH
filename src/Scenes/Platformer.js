@@ -33,6 +33,10 @@ class Platformer extends Phaser.Scene {
         // Create a new tilemap game object which uses 18x18 pixel tiles
         this.map = this.add.tilemap("platformer-level-1", 18, 18, 120, 20);
 
+        // Add and play background music
+        this.backgroundMusic = this.sound.add('bgm', { loop: true, volume: 0.5 });
+        this.backgroundMusic.play();
+
         // Add a tileset to the map
         this.tileset = this.map.addTilesetImage("kenny_tiledmap_packed", "tilemap_tiles");
         this.bgTileset = this.map.addTilesetImage("tilemap_backgrounds_packed", "background_tiles");
@@ -426,6 +430,9 @@ class Platformer extends Phaser.Scene {
                 closestTarget.health -= 10;
                 this.impactSound.play();
                 if (closestTarget.health <= 0) {
+                    // Play death sound
+                    this.sound.play('death');
+
                     closestTarget.destroy();
                     closestTarget.healthBar.destroy();
                     closestTarget.gun.destroy(); // Destroy the gun when the target dies
@@ -747,6 +754,11 @@ class Platformer extends Phaser.Scene {
         this.isShooting = false;
         this.shootSound.stop();
     
+        // Stop background music
+        if (this.backgroundMusic) {
+            this.backgroundMusic.stop();
+        }
+    
         // Update the health display to show 0
         this.updateHealthText();
     
@@ -757,9 +769,8 @@ class Platformer extends Phaser.Scene {
     
         // Stop targets from shooting and moving
         this.targets.forEach(target => {
-            if (target && target.setVelocityX) { // Check if the target and its method exist before calling it
+            if (target && target.setVelocityX) {
                 target.isShooting = false;
-                // target.setVelocityX(0);
             }
         });
 
