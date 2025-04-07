@@ -796,13 +796,15 @@ class Platformer extends Phaser.Scene {
         this.targets.forEach(target => {
             if (target && target.setVelocityX) {
                 target.isShooting = false;
-                // target.setVelocityX(0);
             }
         });
 
-        // Back to main menu after 3 seconds
+        // Stop background music after the delay
         this.time.delayedCall(3000, () => {
-            this.scene.start('MainMenu');
+            if (this.backgroundMusic) {
+                this.backgroundMusic.stop();
+            }
+            this.scene.start('MainMenu'); // Reset to the main menu
         }, [], this);
     }
     
